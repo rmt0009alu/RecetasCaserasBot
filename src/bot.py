@@ -52,20 +52,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.warning(f"Usuario no autorizado {user_id} intentó iniciar el bot")
         await update.message.reply_text(UNAUTHORIZED_MESSAGE)
 
-async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Busca recetas basadas en la consulta del usuario.
-    """
-    user_id = update.effective_user.id
-    query = update.message.text.lower()
+
+# async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+#     """
+#     Busca recetas basadas en la consulta del usuario.
+#     """
+#     user_id = update.effective_user.id
+#     query = update.message.text.lower()
     
-    if user_id in AUTHORIZED_USERS:
-        logger.info(f"Usuario {user_id} busca recetas con: {query}")
-        # Aquí implementarías la lógica para buscar en tus archivos PDF o TEX.
-        await update.message.reply_text(f"Buscando recetas que contengan: {query}")
-    else:
-        logger.warning(f"Usuario no autorizado {user_id} intentó buscar recetas")
-        await update.message.reply_text(UNAUTHORIZED_MESSAGE)
+#     if user_id in AUTHORIZED_USERS:
+#         logger.info(f"Usuario {user_id} busca recetas con: {query}")
+#         # Aquí implementarías la lógica para buscar en tus archivos PDF o TEX.
+#         await update.message.reply_text(f"Buscando recetas que contengan: {query}")
+#     else:
+#         logger.warning(f"Usuario no autorizado {user_id} intentó buscar recetas")
+#         await update.message.reply_text(UNAUTHORIZED_MESSAGE)
 
 def main() -> None:
     """
@@ -78,7 +79,7 @@ def main() -> None:
     
     # Configurar los manejadores de comandos y mensajes
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search_recipe))
+    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search_recipe))
     
     # Iniciar el bot en modo polling (consulta continua)
     logger.info("Bot iniciado y ejecutándose...")
