@@ -1,0 +1,26 @@
+# Para que se ignore la carpeta del entorno virtual
+/venv
+
+# Para ignorar todas las carpetas de pychache
+__pycache__/
+
+# Para ignorar mis anotaciones
+VerInfoÚtil.py
+
+# Para ignorar archivos de pruebas
+/pruebas
+
+# Para ignorar los archivos antiguos
+/old
+
+# Para ignorar el archivo de cobertura de tests
+.coverage
+
+# Para ignorar la carpeta de HTML de 'coverage'
+/htmlcov
+
+# Para ignorar el archivo en el que tengo variables de entorno
+.env
+
+# Para ignorar el archivo de configuración de flake8 y pylint
+setup.cfg
