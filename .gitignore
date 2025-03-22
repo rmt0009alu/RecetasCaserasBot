@@ -24,3 +24,6 @@ VerInfoÚtil.py
 
 # Para ignorar el archivo de configuración de flake8 y pylint
 setup.cfg
+
+# Para ignorar el log
+bot.log

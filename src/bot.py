@@ -6,7 +6,10 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Messa
 from typing import List
 
 # Configuración de logging
+log_file = 'bot.log'
 logging.basicConfig(
+    filename=log_file,
+    filemode='a',
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
@@ -22,9 +25,11 @@ USER_ID_R = os.getenv('USER_ID_R')
 
 # Manejo de errores para las variables de entorno
 if not TELEGRAM_TOKEN:
+    logger.error("TELEGRAM_TOKEN no está definido en el archivo .env")
     raise ValueError("TELEGRAM_TOKEN no está definido en el archivo .env")
 
 if not USER_ID_R:
+    logger.error("USER_ID_R no está definido en el archivo .env")
     raise ValueError("USER_ID_R no está definido en el archivo .env")
 
 # Lista de usuarios autorizados (convertir a entero)
@@ -44,6 +49,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if user_id in AUTHORIZED_USERS:
         await update.message.reply_text(WELCOME_MESSAGE)
     else:
+        logger.warning(f"Usuario no autorizado {user_id} intentó iniciar el bot")
         await update.message.reply_text(UNAUTHORIZED_MESSAGE)
 
 async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -58,7 +64,7 @@ async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         # Aquí implementarías la lógica para buscar en tus archivos PDF o TEX.
         await update.message.reply_text(f"Buscando recetas que contengan: {query}")
     else:
-        logger.warning(f"Usuario no autorizado {user_id} intentó buscar recetas.")
+        logger.warning(f"Usuario no autorizado {user_id} intentó buscar recetas")
         await update.message.reply_text(UNAUTHORIZED_MESSAGE)
 
 def main() -> None:
@@ -82,4 +88,4 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as e:
-        logger.error(f"Error inesperado: {e}")
+        logger.error(f"Error inesperado: {e}", exc_info=True)
