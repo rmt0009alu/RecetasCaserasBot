@@ -1,53 +1,18 @@
 import os
-import logging
-from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
-from typing import List
+from settings import *
+from log.logger import setup_logger
 
-# Configuración de logging
-log_file = 'bot.log'
-logging.basicConfig(
-    filename=log_file,
-    filemode='a',
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-logger = logging.getLogger(__name__)
-
-# Cargar variables de entorno desde .env
-load_dotenv()
-
-# Variables de entorno
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-USER_ID_R = os.getenv('USER_ID_R')
-
-# Manejo de errores para las variables de entorno
-if not TELEGRAM_TOKEN:
-    logger.error("TELEGRAM_TOKEN no está definido en el archivo .env")
-    raise ValueError("TELEGRAM_TOKEN no está definido en el archivo .env")
-
-if not USER_ID_R:
-    logger.error("USER_ID_R no está definido en el archivo .env")
-    raise ValueError("USER_ID_R no está definido en el archivo .env")
-
-# Lista de usuarios autorizados (convertir a entero)
-AUTHORIZED_USERS: List[int] = [int(USER_ID_R)]
-
-# Constantes para mensajes
-WELCOME_MESSAGE = 'Bienvenido al buscador de recetas. ¿Qué receta buscas?'
-UNAUTHORIZED_MESSAGE = 'Lo siento, no tienes autorización para usar este bot.'
-
-# Ruta base donde se encuentran las recetas organizadas por categorías
-BASE_DIR = "recetas"
+# Obtengo la configuración del logger
+logger = setup_logger()
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Maneja el comando /start del bot.
     Muestra el menú principal con las categorías de recetas.
-    """
+    """    
     user_id = update.effective_user.id
     logger.info(f"Usuario {user_id} ejecutó /start")
     
