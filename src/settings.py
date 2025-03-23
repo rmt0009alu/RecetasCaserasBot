@@ -1,10 +1,7 @@
 import os
 from dotenv import load_dotenv
 from typing import List
-from log.logger import setup_logger
-
-# Obtengo la configuración del logger
-logger = setup_logger()
+from log.logger import logger
 
 
 # ---------------------------------------------------------------
@@ -39,7 +36,7 @@ AUTHORIZED_USERS: List[int] = [int(USER_ID_R), int(USER_ID_C)]
 # MENSAJES INFORMATIVOS
 # ---------------------------------------------------------------
 # Constantes para mensajes
-WELCOME_MESSAGE = 'Bienvenido al buscador de recetas. ¿Qué receta buscas?'
+WELCOME_MESSAGE = f"\n🍽 *Bienvenido/a al bot de recetas* 🍽\n"
 UNAUTHORIZED_MESSAGE = 'Lo siento, no tienes autorización para usar este bot.'
 
 

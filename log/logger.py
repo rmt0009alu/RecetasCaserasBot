@@ -6,11 +6,12 @@ def setup_logger():
 
     Parameters
     ----------
-
+    None 
+    
     Returns
     -------
-        logger
-            El logger ya configurado y listo para usar.
+    logger
+        El logger ya configurado y listo para usar.
     """
     logger = logging.getLogger("TelegramBot")  # Usamos un nombre específico para el logger
     logger.setLevel(logging.INFO)  # Configuramos el nivel global
@@ -34,3 +35,10 @@ def setup_logger():
     logger.addHandler(console_handler)
 
     return logger
+
+
+# Creo la variable con el logger. Es mejor crearla aquí y no
+# llamar a la función desde otros archivos. Así conseguimos que
+# se cree una única vez y se utilice en todo el programa (si no,
+# se crearía un logger cada que se llama a la función setup_logger())
+logger = setup_logger()

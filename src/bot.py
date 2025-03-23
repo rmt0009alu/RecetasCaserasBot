@@ -1,43 +1,97 @@
+import sys
 import os
+# Agregar el directorio raíz al sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 from settings import *
-from log.logger import setup_logger
-
-# Obtengo la configuración del logger
-logger = setup_logger()
+from log.logger import logger
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Maneja el comando /start del bot.
-    Muestra el menú principal con las categorías de recetas.
-    """    
+    Maneja el comando /start del bot y muestra el menú principal con las categorías de recetas.
+
+    Parameters
+    ----------
+    update : Update
+        Objeto de actualización de Telegram.
+    context : ContextTypes.DEFAULT_TYPE
+        Contexto de ejecución del bot.
+
+    Returns
+    -------
+    None
+    """
     user_id = update.effective_user.id
     logger.info(f"Usuario {user_id} ejecutó /start")
-    
+
+    # Limpiar el chat: eliminar el mensaje anterior si existe
+    if update.message:
+        try:
+            await update.message.delete()
+        except Exception as e:
+            logger.error(f"No se pudo eliminar el mensaje anterior: {e}")
+
     if user_id in AUTHORIZED_USERS:
-        await update.message.reply_text(WELCOME_MESSAGE)
+        # Verificamos si update.message está disponible, si no, usamos query.message
+        if update.message:
+            await update.message.reply_text(WELCOME_MESSAGE, parse_mode="Markdown")
+        else:
+            # Si update.message es None, se puede usar query.message (cuando el comando es desde un callback)
+            # pero prefiero que no muestre ningún mensaje, porque este caso se da cuando el usuario 'vuelve'
+            # al menú principal:
+            # await update.callback_query.message.reply_text(f"🍽 *EPA* 🍽\n\n¿Qué receta buscas?", parse_mode="Markdown")
+            pass
     else:
         logger.warning(f"Usuario no autorizado {user_id} intentó iniciar el bot")
         await update.message.reply_text(UNAUTHORIZED_MESSAGE)
-    
+        # Si el usuario no está autorizado no se continúa
+        return
+
     # Obtener las categorías (subdirectorios en BASE_DIR)
     categorias = [d for d in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, d))]
+    
+    # # Crear botones para cada categoría en una columna
+    # keyboard = [[InlineKeyboardButton(categoria.capitalize(), callback_data=f"categoria|{categoria}")]
+    #             for categoria in categorias]
 
-    # Crear botones para cada categoría
-    keyboard = [[InlineKeyboardButton(categoria.capitalize(), callback_data=f"categoria|{categoria}")]
-                for categoria in categorias]
+    # Creo el menú con doble botonera
+    keyboard = []
+    row = []
+    for i, categoria in enumerate(categorias, 1):
+        row.append(InlineKeyboardButton(f"📂 {categoria.capitalize()}", callback_data=f"categoria|{categoria}"))
+        if i % 2 == 0:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # Enviar mensaje con los botones al usuario
-    await update.message.reply_text("Selecciona una categoría:", reply_markup=reply_markup)
+    
+    # Verificamos nuevamente si update.message está disponible (venimos de inicio)
+    if update.message:
+        await update.message.reply_text("Selecciona una categoría:", reply_markup=reply_markup)
+    else:
+        # Si no, usamos query.message (venimos de 'volver' en el menú)
+        await update.callback_query.message.reply_text("Selecciona una categoría:", reply_markup=reply_markup)
 
 
 async def mostrar_recetas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Muestra las recetas disponibles en una categoría seleccionada.
+
+    Parameters
+    ----------
+    update : Update
+        Objeto de actualización de Telegram.
+    context : ContextTypes.DEFAULT_TYPE
+        Contexto de ejecución del bot.
+
+    Returns
+    -------
+    None
     """
     query = update.callback_query
     await query.answer()
@@ -49,24 +103,40 @@ async def mostrar_recetas(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Listar los archivos PDF en la categoría seleccionada
     recetas = [f for f in os.listdir(categoria_path) if f.endswith(".pdf")]
 
-    # Crear botones para cada receta
-    keyboard = [[InlineKeyboardButton(receta.replace(".pdf", "").capitalize(),
-                                       callback_data=f"receta|{categoria}|{receta}")]
-                for receta in recetas]
+    # Crear una estructura de teclado que simule un submenú con los botones desplazados a la derecha
+    keyboard = []
     
+    # Agregar una fila con un espacio vacío al principio para "desplazar" los botones
+    for receta in recetas:
+        # Agregar una columna vacía al principio para desplazar los botones a la derecha
+        row = [InlineKeyboardButton(f" - {receta.replace('.pdf', '').capitalize()}", 
+                                    callback_data=f"receta|{categoria}|{receta}")]
+        keyboard.append(row)
+
     # Agregar un botón para volver al menú principal
     keyboard.append([InlineKeyboardButton("⬅️ Volver al menú principal", callback_data="volver")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     # Editar el mensaje anterior para mostrar las recetas disponibles
-    await query.edit_message_text(f"Recetas en la categoría *{categoria.capitalize()}*:", 
-                                   reply_markup=reply_markup, parse_mode="Markdown")
-    
+    await query.edit_message_text(f"📂 *Recetas en la categoría* _{categoria.capitalize()}_:", 
+                                  reply_markup=reply_markup, parse_mode="Markdown")
+
 
 async def enviar_receta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Envía el archivo PDF de la receta seleccionada.
+
+    Parameters
+    ----------
+    update : Update
+        Objeto de actualización de Telegram.
+    context : ContextTypes.DEFAULT_TYPE
+        Contexto de ejecución del bot.
+
+    Returns
+    -------
+    None
     """
     query = update.callback_query
     await query.answer()
@@ -82,12 +152,37 @@ async def enviar_receta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def volver_menu_principal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Vuelve al menú principal desde cualquier parte del bot.
+
+    Parameters
+    ----------
+    update : Update
+        Objeto de actualización de Telegram.
+    context : ContextTypes.DEFAULT_TYPE
+        Contexto de ejecución del bot.
+
+    Returns
+    -------
+    None
     """
     query = update.callback_query
     await query.answer()
-    
-    # Llamar a la función `start` para mostrar el menú principal nuevamente
-    await start(update, context)
+
+    user_id = update.effective_user.id
+    logger.info(f"Usuario {user_id} ha vuelto al menú principal.")
+
+    # Limpiar el chat: eliminar el mensaje anterior si existe
+    try:
+        # Eliminar el mensaje de bienvenida
+        await query.message.delete()
+    except Exception as e:
+        logger.error(f"No se pudo eliminar el mensaje anterior: {e}")
+
+    if user_id in AUTHORIZED_USERS:
+        # Reutilizamos el 'context' para enviar el mensaje
+        await start(update, context)
+    else:
+        logger.warning(f"Usuario no autorizado {user_id} intentó volver al menú principal.")
+        await query.message.reply_text(UNAUTHORIZED_MESSAGE)
 
 
 # async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -105,9 +200,18 @@ async def volver_menu_principal(update: Update, context: ContextTypes.DEFAULT_TY
 #         logger.warning(f"Usuario no autorizado {user_id} intentó buscar recetas")
 #         await update.message.reply_text(UNAUTHORIZED_MESSAGE)
 
+
 def main() -> None:
     """
-    Función principal para configurar y ejecutar el bot.
+    Función principal para ejecutar el bot.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
     """
     logger.info("Iniciando el bot...")
     
