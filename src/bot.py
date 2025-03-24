@@ -5,8 +5,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.error import BadRequest
 from settings import *
 from log.logger import logger
+import asyncio
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -68,6 +70,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if row:
         keyboard.append(row)
 
+    # Añado el reset también en el menú principal
+    keyboard.append([InlineKeyboardButton("❌ Reiniciar el bot", callback_data="reset")])
+
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     # Verificamos nuevamente si update.message está disponible (venimos de inicio)
@@ -115,6 +120,7 @@ async def mostrar_recetas(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # Agregar un botón para volver al menú principal
     keyboard.append([InlineKeyboardButton("⬅️ Volver al menú principal", callback_data="volver")])
+    keyboard.append([InlineKeyboardButton("❌ Reiniciar el bot", callback_data="reset")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -125,7 +131,8 @@ async def mostrar_recetas(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def enviar_receta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Envía el archivo PDF de la receta seleccionada.
+    Envía el archivo PDF de la receta seleccionada. Muestra una barra de progreso
+    animada para que el usuario entienda que se está descargando.
 
     Parameters
     ----------
@@ -145,8 +152,35 @@ async def enviar_receta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     _, categoria, receta_pdf = query.data.split("|")
     receta_path = os.path.join(BASE_DIR, categoria, receta_pdf)
 
-    # Enviar el archivo PDF al usuario
-    await context.bot.send_document(chat_id=query.message.chat_id, document=open(receta_path, "rb"))
+    # Mensaje inicial con barra vacía
+    progress_template = "Preparando receta: [{bar}] {percent}%"
+    progress_bar = "░░░░░░░░░░"  # 10 bloques vacíos
+    message = await query.edit_message_text(progress_template.format(bar=progress_bar, percent=0))
+
+    # Para la simulación de la barra de progreso con actualizaciones
+    progress_steps = ["█░░░░░░░░░", "██░░░░░░░░", "███░░░░░░░", "████░░░░░░",
+                      "█████░░░░░", "██████░░░░", "███████░░░", "████████░░",
+                      "█████████░", "██████████"]
+    # Simulación de la barra de progreso
+    for i, step in enumerate(progress_steps):
+        await asyncio.sleep(0.5)  # Pequeño retraso para la animación
+        await message.edit_text(progress_template.format(bar=step, percent=(i + 1) * 10))
+
+    # Crear botón para volver al menú principal
+    # keyboard = [[InlineKeyboardButton("⬅️ Volver al menú principal", callback_data="volver")]]
+    keyboard = [
+        [InlineKeyboardButton("⬅️ Volver al menú principal", callback_data="volver")],
+        [InlineKeyboardButton("❌ Reiniciar el bot", callback_data="reset")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Enviar el archivo PDF después de completar la "descarga"
+    try:
+        await context.bot.send_document(chat_id=query.message.chat_id, document=open(receta_path, "rb"))
+        await query.message.reply_text("Ya puedes descargar la receta 😊", reply_markup=reply_markup)
+    except Exception as e:
+        logger.error(f"Error al enviar la receta {receta_pdf}: {e}")
+        await query.message.reply_text("❌ Hubo un error al enviar la receta. Inténtalo nuevamente más tarde.", reply_markup=reply_markup)
 
 
 async def volver_menu_principal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -201,6 +235,50 @@ async def volver_menu_principal(update: Update, context: ContextTypes.DEFAULT_TY
 #         await update.message.reply_text(UNAUTHORIZED_MESSAGE)
 
 
+async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Restablece la sesión del usuario y elimina todos los mensajes del chat.
+
+    Parameters
+    ----------
+    update : Update
+        Objeto de actualización de Telegram.
+    context : ContextTypes.DEFAULT_TYPE
+        Contexto de ejecución del bot.
+
+    Returns
+    -------
+    None
+    """
+    query = update.callback_query
+    await query.answer()
+
+    user_id = update.effective_user.id
+    chat_id = query.message.chat_id
+    logger.info(f"Usuario {user_id} ha solicitado un reseteo completo del chat.")
+
+    # Limpiar los datos almacenados del usuario
+    context.user_data.clear()
+
+    # Intentar eliminar los últimos mensajes del bot en paralelo
+    try:
+        message_id = query.message.message_id
+        delete_tasks = []
+
+        # Intentamos eliminar los últimos 200 mensajes del bot (ajustable según necesidad)
+        for msg_id in range(message_id, message_id - 200, -1):
+            delete_tasks.append(context.bot.delete_message(chat_id=chat_id, message_id=msg_id))
+
+        # Ejecutamos todas las eliminaciones en paralelo
+        await asyncio.gather(*delete_tasks)
+
+    except BadRequest as e:
+        logger.warning(f"Finalizada limpieza")
+
+    except Exception as e:
+        logger.error(f"Error al intentar limpiar el chat: {e}")
+
+
 def main() -> None:
     """
     Función principal para ejecutar el bot.
@@ -226,6 +304,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(mostrar_recetas, pattern="^categoria\\|"))
     app.add_handler(CallbackQueryHandler(enviar_receta, pattern="^receta\\|"))
     app.add_handler(CallbackQueryHandler(volver_menu_principal, pattern="^volver$"))
+    app.add_handler(CallbackQueryHandler(reset, pattern="^reset$"))
     
     # Iniciar el bot en modo polling (consulta continua)
     logger.info("Bot iniciado y ejecutándose...")
