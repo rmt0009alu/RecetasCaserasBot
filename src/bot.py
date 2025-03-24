@@ -4,7 +4,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from telegram.error import BadRequest
 from settings import *
 from log.logger import logger
@@ -71,16 +71,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         keyboard.append(row)
 
     # Añado el reset también en el menú principal
+
+    # Agregar un botón para buscar recetas y el botón de reiniciar
+    keyboard.append([InlineKeyboardButton("🔍 Buscar recetas", callback_data="buscar_recetas")])
     keyboard.append([InlineKeyboardButton("❌ Reiniciar el bot", callback_data="reset")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     # Verificamos nuevamente si update.message está disponible (venimos de inicio)
     if update.message:
-        await update.message.reply_text("Selecciona una categoría:", reply_markup=reply_markup)
+        await update.message.reply_text("Selecciona una categoría o busca una receta:", reply_markup=reply_markup)
     else:
         # Si no, usamos query.message (venimos de 'volver' en el menú)
-        await update.callback_query.message.reply_text("Selecciona una categoría:", reply_markup=reply_markup)
+        await update.callback_query.message.reply_text("Selecciona una categoría o busca una receta (usa palabras representativas)", reply_markup=reply_markup)
+        keyboard.append([InlineKeyboardButton("❌ Reiniciar el bot", callback_data="reset")])
+
+    # reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # # Verificamos nuevamente si update.message está disponible (venimos de inicio)
+    # if update.message:
+    #     await update.message.reply_text("Selecciona una categoría:", reply_markup=reply_markup)
+    # else:
+    #     # Si no, usamos query.message (venimos de 'volver' en el menú)
+    #     await update.callback_query.message.reply_text("Selecciona una categoría:", reply_markup=reply_markup)
 
 
 async def mostrar_recetas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -219,20 +232,99 @@ async def volver_menu_principal(update: Update, context: ContextTypes.DEFAULT_TY
         await query.message.reply_text(UNAUTHORIZED_MESSAGE)
 
 
-# async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-#     """
-#     Busca recetas basadas en la consulta del usuario.
-#     """
-#     user_id = update.effective_user.id
-#     query = update.message.text.lower()
+async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Busca recetas basadas en el nombre de la receta.
     
-#     if user_id in AUTHORIZED_USERS:
-#         logger.info(f"Usuario {user_id} busca recetas con: {query}")
-#         # Aquí implementarías la lógica para buscar en tus archivos PDF o TEX.
-#         await update.message.reply_text(f"Buscando recetas que contengan: {query}")
-#     else:
-#         logger.warning(f"Usuario no autorizado {user_id} intentó buscar recetas")
-#         await update.message.reply_text(UNAUTHORIZED_MESSAGE)
+    Parameters
+    ----------
+    update : Update
+        Objeto de actualización de Telegram.
+    context : ContextTypes.DEFAULT_TYPE
+        Contexto de ejecución del bot.
+
+    Returns
+    -------
+    None
+    """
+    user_id = update.effective_user.id
+    query = update.message.text.lower()
+
+    if user_id not in AUTHORIZED_USERS:
+        logger.warning(f"Usuario no autorizado {user_id} intentó buscar recetas.")
+        await update.message.reply_text(UNAUTHORIZED_MESSAGE)
+        return
+
+    logger.info(f"Usuario {user_id} busca recetas con: {query}")
+
+    # Obtener todas las categorías (subdirectorios en BASE_DIR)
+    categorias = [d for d in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, d))]
+
+    # Buscar recetas que coincidan con la consulta en cada categoría
+    resultados = []
+    for categoria in categorias:
+        categoria_path = os.path.join(BASE_DIR, categoria)
+        for receta in os.listdir(categoria_path):
+            if receta.endswith(".pdf") and query in receta.lower():
+                resultados.append((categoria, receta))
+
+    # Verificar si se encontraron resultados
+    if resultados:
+        # Crear botones con los resultados encontrados
+        keyboard = [
+            [InlineKeyboardButton(f" - {receta.replace('.pdf', '').capitalize()}", 
+                                 callback_data=f"receta|{categoria}|{receta}")]
+            for categoria, receta in resultados
+        ]
+        
+        keyboard.append([InlineKeyboardButton("⬅️ Volver al menú principal", callback_data="volver")])
+        keyboard.append([InlineKeyboardButton("❌ Reiniciar el bot", callback_data="reset")])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(f"📝 Resultados para '{query}':", reply_markup=reply_markup)
+
+    else:
+        keyboard = [
+            [InlineKeyboardButton("⬅️ Volver al menú principal", callback_data="volver")],
+            [InlineKeyboardButton("❌ Reiniciar el bot", callback_data="reset")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(f"No se encontraron recetas que coincidan con '{query}'. Puedes seguir buscando o usar los botones:", reply_markup=reply_markup)
+
+
+async def iniciar_busqueda(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Inicia la búsqueda de recetas cuando el usuario presiona el botón de 'Buscar recetas'.
+    
+    Parameters
+    ----------
+    update : Update
+        Objeto de actualización de Telegram.
+    context : ContextTypes.DEFAULT_TYPE
+        Contexto de ejecución del bot.
+
+    Returns
+    -------
+    None
+    """
+    query = update.callback_query
+    await query.answer()
+
+    user_id = update.effective_user.id
+    logger.info(f"Usuario {user_id} ha iniciado la búsqueda de recetas.")
+
+    # Limpiar el chat: eliminar el mensaje anterior si existe
+    try:
+        # Eliminar el mensaje de bienvenida
+        await query.message.delete()
+    except Exception as e:
+        logger.error(f"No se pudo eliminar el mensaje anterior: {e}")
+
+    if user_id in AUTHORIZED_USERS:
+        await query.message.reply_text("Indica alguna palabra representativa de la receta que buscas", parse_mode="Markdown")
+    else:
+        logger.warning(f"Usuario no autorizado {user_id} intentó buscar recetas.")
+        await query.message.reply_text(UNAUTHORIZED_MESSAGE)
 
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -298,13 +390,17 @@ def main() -> None:
     
     # Configurar los manejadores de comandos y mensajes
     app.add_handler(CommandHandler("start", start))
-    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search_recipe))
+
+    # Manejador para capturar cualquier mensaje de texto y buscar recetas
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search_recipe))
 
     # CallbackQueryHandlers para manejar interacciones con botones
     app.add_handler(CallbackQueryHandler(mostrar_recetas, pattern="^categoria\\|"))
     app.add_handler(CallbackQueryHandler(enviar_receta, pattern="^receta\\|"))
     app.add_handler(CallbackQueryHandler(volver_menu_principal, pattern="^volver$"))
     app.add_handler(CallbackQueryHandler(reset, pattern="^reset$"))
+    app.add_handler(CallbackQueryHandler(iniciar_busqueda, pattern="^buscar_recetas$"))
+
     
     # Iniciar el bot en modo polling (consulta continua)
     logger.info("Bot iniciado y ejecutándose...")
