@@ -53,8 +53,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     # Obtener las categorías (subdirectorios en BASE_DIR)
-    categorias = [d for d in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, d))]
-    
+    # categorias = [d for d in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, d))]
+
+    # Obtener todas las categorías asegurando que estén ordenadas
+    categorias = sorted(
+        [d for d in os.listdir(BASE_DIR) if os.path.exists(os.path.join(BASE_DIR, d)) and os.path.isdir(os.path.join(BASE_DIR, d))],
+        key=lambda x: x.lower()
+    )
+
     # # Crear botones para cada categoría en una columna
     # keyboard = [[InlineKeyboardButton(categoria.capitalize(), callback_data=f"categoria|{categoria}")]
     #             for categoria in categorias]
@@ -69,8 +75,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             row = []
     if row:
         keyboard.append(row)
-
-    # Añado el reset también en el menú principal
 
     # Agregar un botón para buscar recetas y el botón de reiniciar
     keyboard.append([InlineKeyboardButton("🔍 Buscar recetas", callback_data="buscar_recetas")])
@@ -110,15 +114,17 @@ async def mostrar_recetas(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     categoria_path = os.path.join(BASE_DIR, categoria)
 
     # Listar los archivos PDF en la categoría seleccionada
-    recetas = [f for f in os.listdir(categoria_path) if f.endswith(".pdf")]
+    # recetas = [f for f in os.listdir(categoria_path) if f.endswith(".pdf")]
+    # Lo mismo pero con las recetas ordenadas
+    recetas = sorted([f for f in os.listdir(categoria_path) if f.endswith(".pdf")], key=lambda x: x.lower())
 
     # Crear una estructura de teclado que simule un submenú con los botones desplazados a la derecha
     keyboard = []
-    
+
     # Agregar una fila con un espacio vacío al principio para "desplazar" los botones
     for receta in recetas:
         # Agregar una columna vacía al principio para desplazar los botones a la derecha
-        row = [InlineKeyboardButton(f" - {receta.replace('.pdf', '').capitalize()}", 
+        row = [InlineKeyboardButton(f" - {receta.replace('.pdf', '').capitalize()}",
                                     callback_data=f"receta|{categoria}|{receta}")]
         keyboard.append(row)
 
@@ -129,7 +135,7 @@ async def mostrar_recetas(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     # Editar el mensaje anterior para mostrar las recetas disponibles
-    await query.edit_message_text(f"📂 *Recetas en la categoría* _{categoria.capitalize()}_:", 
+    await query.edit_message_text(f"📂 *Recetas en la categoría* _{categoria.capitalize()}_:",
                                   reply_markup=reply_markup, parse_mode="Markdown")
 
 
@@ -226,7 +232,7 @@ async def volver_menu_principal(update: Update, context: ContextTypes.DEFAULT_TY
 async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Busca recetas basadas en el nombre de la receta.
-    
+
     Parameters
     ----------
     update : Update
@@ -249,7 +255,13 @@ async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.info(f"Usuario {user_id} busca recetas con: {query}")
 
     # Obtener todas las categorías (subdirectorios en BASE_DIR)
-    categorias = [d for d in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, d))]
+    # categorias = [d for d in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, d))]
+
+    # Obtener todas las categorías asegurando que también se incluyan carpetas vacías y estén ordenadas
+    categorias = sorted(
+        [d for d in os.listdir(BASE_DIR) if os.path.exists(os.path.join(BASE_DIR, d)) and os.path.isdir(os.path.join(BASE_DIR, d))],
+        key=lambda x: x.lower()
+    )
 
     # Buscar recetas que coincidan con la consulta en cada categoría
     resultados = []
@@ -259,15 +271,18 @@ async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             if receta.endswith(".pdf") and query in receta.lower():
                 resultados.append((categoria, receta))
 
+    # Ordena por nombre de receta (ignorando mayúsculas)
+    resultados.sort(key=lambda x: x[1].lower())
+
     # Verificar si se encontraron resultados
     if resultados:
         # Crear botones con los resultados encontrados
         keyboard = [
-            [InlineKeyboardButton(f" - {receta.replace('.pdf', '').capitalize()}", 
+            [InlineKeyboardButton(f" - {receta.replace('.pdf', '').capitalize()}",
                                  callback_data=f"receta|{categoria}|{receta}")]
             for categoria, receta in resultados
         ]
-        
+
         keyboard.append([InlineKeyboardButton("⬅️ Volver al menú principal", callback_data="volver")])
         keyboard.append([InlineKeyboardButton("❌ Reiniciar el bot", callback_data="reset")])
 
@@ -286,7 +301,7 @@ async def search_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def iniciar_busqueda(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Inicia la búsqueda de recetas cuando el usuario presiona el botón de 'Buscar recetas'.
-    
+
     Parameters
     ----------
     update : Update
@@ -427,10 +442,10 @@ def main() -> None:
     None
     """
     logger.info("Iniciando el bot...")
-    
+
     # Crear la aplicación del bot con el token
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    
+
     # Configurar los manejadores de comandos y mensajes
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("info", info))
@@ -444,7 +459,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(enviar_receta, pattern="^receta\\|"))
     app.add_handler(CallbackQueryHandler(volver_menu_principal, pattern="^volver$"))
     app.add_handler(CallbackQueryHandler(reset, pattern="^reset$"))
-    app.add_handler(CallbackQueryHandler(iniciar_busqueda, pattern="^buscar_recetas$"))    
+    app.add_handler(CallbackQueryHandler(iniciar_busqueda, pattern="^buscar_recetas$"))
 
     # Iniciar el bot en modo polling (consulta continua)
     logger.info("Bot iniciado y ejecutándose...")
