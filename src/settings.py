@@ -70,6 +70,7 @@ UNAUTHORIZED_MESSAGE = "Lo siento, no tienes autorización para usar este bot."
 # RUTA BASE DE ARCHIVOS
 # ---------------------------------------------------------------
 # Ruta base donde se encuentran las recetas organizadas por categorías
+# BASE_DIR = "../recetas" <--- Para server
 BASE_DIR = "recetas"
 
 # Asegurar que la ruta BASE_DIR existe

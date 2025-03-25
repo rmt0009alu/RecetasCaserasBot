@@ -17,6 +17,7 @@ def setup_logger():
     logger.setLevel(logging.INFO)  # Configuramos el nivel global
 
     # Manejador para los logs en archivo
+    # log_file = '../log/bot.log' <- Para server
     log_file = 'log/bot.log'
     file_handler = logging.FileHandler(log_file)
     file_handler.setLevel(logging.INFO)  # Puedes personalizar el nivel para cada manejador
