@@ -15,6 +15,7 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 USER_ID_R = os.getenv('USER_ID_R')
 USER_ID_C = os.getenv('USER_ID_C')
 USER_ID_E = os.getenv('USER_ID_E')
+USER_ID_O = os.getenv('USER_ID_O')
 
 # Manejo de errores para las variables de entorno
 if not TELEGRAM_TOKEN:
@@ -30,7 +31,7 @@ if not USER_ID_R:
 # USUARIOS AUTORIZADOS
 # ---------------------------------------------------------------
 # Lista de usuarios autorizados (convertir a entero)
-AUTHORIZED_USERS: List[int] = [int(USER_ID_R), int(USER_ID_C), int(USER_ID_E)]
+AUTHORIZED_USERS: List[int] = [int(USER_ID_R), int(USER_ID_C), int(USER_ID_E), int(USER_ID_O)]
 
 
 # ---------------------------------------------------------------
