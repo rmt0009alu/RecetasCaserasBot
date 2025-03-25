@@ -86,15 +86,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.callback_query.message.reply_text("Selecciona una categoría o busca una receta (usa palabras representativas)", reply_markup=reply_markup)
         keyboard.append([InlineKeyboardButton("❌ Reiniciar el bot", callback_data="reset")])
 
-    # reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # # Verificamos nuevamente si update.message está disponible (venimos de inicio)
-    # if update.message:
-    #     await update.message.reply_text("Selecciona una categoría:", reply_markup=reply_markup)
-    # else:
-    #     # Si no, usamos query.message (venimos de 'volver' en el menú)
-    #     await update.callback_query.message.reply_text("Selecciona una categoría:", reply_markup=reply_markup)
-
 
 async def mostrar_recetas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -371,6 +362,58 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.error(f"Error al intentar limpiar el chat: {e}")
 
 
+async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Para mostrar información del bot.
+
+    Parameters
+    ----------
+    update : Update
+        Objeto de actualización de Telegram.
+    context : ContextTypes.DEFAULT_TYPE
+        Contexto de ejecución del bot.
+
+    Returns
+    -------
+    None
+    """
+    user = update.effective_user
+    info_message = (
+        f"ℹ️ *Información del Bot*\n\n"
+        f"🤖 Nombre del bot: {context.bot.name}\n"
+        f"👤 Tu nombre: {user.first_name}\n"
+        f"🆔 Tu ID: {user.id}\n"
+        f"📚 Este bot te ayuda a buscar recetas.\n"
+        f"💡 Puedes usar /start para ver el menú principal."
+    )
+    await update.message.reply_text(info_message, parse_mode="Markdown")
+
+
+async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Para mostrar información del bot.
+
+    Parameters
+    ----------
+    update : Update
+        Objeto de actualización de Telegram.
+    context : ContextTypes.DEFAULT_TYPE
+        Contexto de ejecución del bot.
+
+    Returns
+    -------
+    None
+    """
+    help_message = (
+        "*Comandos disponibles:*\n\n"
+        "/start - Inicia el bot y muestra el menú principal\n"
+        "/info - Muestra información sobre el bot\n"
+        "/help - Muestra este mensaje de ayuda\n\n"
+        "También puedes usar el botón '🔍 Buscar recetas' para encontrar recetas específicas."
+    )
+    await update.message.reply_text(help_message, parse_mode="Markdown")
+
+
 def main() -> None:
     """
     Función principal para ejecutar el bot.
@@ -390,6 +433,8 @@ def main() -> None:
     
     # Configurar los manejadores de comandos y mensajes
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("info", info))
+    app.add_handler(CommandHandler("help", help))
 
     # Manejador para capturar cualquier mensaje de texto y buscar recetas
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search_recipe))
@@ -399,9 +444,8 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(enviar_receta, pattern="^receta\\|"))
     app.add_handler(CallbackQueryHandler(volver_menu_principal, pattern="^volver$"))
     app.add_handler(CallbackQueryHandler(reset, pattern="^reset$"))
-    app.add_handler(CallbackQueryHandler(iniciar_busqueda, pattern="^buscar_recetas$"))
+    app.add_handler(CallbackQueryHandler(iniciar_busqueda, pattern="^buscar_recetas$"))    
 
-    
     # Iniciar el bot en modo polling (consulta continua)
     logger.info("Bot iniciado y ejecutándose...")
     app.run_polling()
